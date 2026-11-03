@@ -1,0 +1,29 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand: #e11d2e;
+  --color-ink: #0a0a0a;
+  --color-card: #151515;
+}
+
+body {
+  background: var(--color-ink);
+  color: white;
+  margin: 0;
+}
+
+.color-bends-container.app-background {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.app-content {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+}

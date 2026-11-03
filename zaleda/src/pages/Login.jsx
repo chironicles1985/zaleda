@@ -1,0 +1,1 @@
+export default function Batch() { return <div className="p-4">Login</div> }
