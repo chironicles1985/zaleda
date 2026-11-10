@@ -1,6 +1,9 @@
-import { useRef } from 'react'
-import { Link } from 'react-router-dom'
-import { Users, GraduationCap, ArrowRight, ChevronDown } from 'lucide-react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Users, GraduationCap, ArrowRight, ChevronDown, Check } from 'lucide-react'
+import { supabase } from '../lib/supabase'
+import { hasPending } from '../lib/outbox'
+import { useLineup } from '../lib/useLineup'
 
 const batches = [
   {
@@ -26,12 +29,105 @@ const batches = [
   },
 ]
 
+function BatchCard({ b, votedIds }) {
+  const Icon = b.icon
+  const { performances } = useLineup(b.id)
+
+  // done = every performance in this batch is submitted (synced or saved on device)
+  const done =
+    !!votedIds &&
+    !!performances?.length &&
+    performances.every((p) => votedIds.has(p.id) || hasPending(p.id))
+
+  const inner = (
+    <>
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(225,29,46,0.22),transparent_55%)]" />
+
+      <div className="relative flex items-center gap-4 sm:gap-5 md:gap-6">
+        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-brand shadow-lg shadow-brand/30 sm:h-16 sm:w-16 md:h-[4.5rem] md:w-[4.5rem]">
+          <Icon className="h-7 w-7 text-white sm:h-8 sm:w-8 md:h-9 md:w-9" strokeWidth={2} />
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div className="text-lg font-bold sm:text-xl md:text-2xl">{b.title}</div>
+          <div className="text-sm leading-snug text-white/60 sm:text-base">{b.sub}</div>
+        </div>
+
+        {done ? (
+          <span className="flex shrink-0 items-center gap-1 rounded-full bg-white/15 px-3 py-1.5 text-xs font-semibold text-white sm:text-sm">
+            <Check className="h-4 w-4" /> Done
+          </span>
+        ) : (
+          <ArrowRight className="h-6 w-6 shrink-0 text-brand sm:h-7 sm:w-7 md:h-8 md:w-8" />
+        )}
+      </div>
+
+      <div className="relative mt-4 flex flex-wrap items-center gap-2 sm:mt-5 sm:gap-2.5 md:mt-6 md:gap-3">
+        {b.chips.map((c) => (
+          <span
+            key={c}
+            className="rounded-full bg-white/10 px-3 py-1.5 text-xs text-white/80 sm:px-4 sm:py-2 sm:text-sm"
+          >
+            {c}
+          </span>
+        ))}
+      </div>
+    </>
+  )
+
+  const base =
+    'relative block overflow-hidden rounded-3xl border border-white/10 bg-card p-5 sm:rounded-[1.75rem] sm:p-6 md:p-7'
+
+  // finished: not a link, so it can't be opened
+  if (done) {
+    return (
+      <div aria-disabled="true" className={`${base} cursor-not-allowed opacity-50 grayscale`}>
+        {inner}
+      </div>
+    )
+  }
+
+  return (
+    <Link to={`/batch/${b.id}`} className={`${base} transition active:scale-[0.98]`}>
+      {inner}
+    </Link>
+  )
+}
+
 export default function Home() {
   const batchesRef = useRef(null)
+  const location = useLocation()
+  const navigate = useNavigate()
+  const [votedIds, setVotedIds] = useState(null) // Set of performance ids this judge submitted
 
   const scrollToBatches = () => {
     batchesRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
+
+  // coming back from the "finished the roster" screen: jump straight to the batches
+  useLayoutEffect(() => {
+    if (!location.state?.scrollToBatches) return
+    batchesRef.current?.scrollIntoView({ behavior: 'auto' })
+    navigate('/', { replace: true, state: null }) // clear the flag so a refresh doesn't re-scroll
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // which performances has this judge already submitted?
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        if (!cancelled) setVotedIds(new Set())
+        return
+      }
+      const { data } = await supabase
+        .from('votes')
+        .select('performance_id')
+        .eq('judge_id', session.user.id)
+      if (!cancelled) setVotedIds(new Set((data ?? []).map((v) => v.performance_id)))
+    })()
+    return () => { cancelled = true }
+  }, [])
 
   return (
     <div>
@@ -41,7 +137,7 @@ export default function Home() {
           {/* logo */}
           <img
             src="/logo-white.png"
-            alt="Zaleda"
+            alt="SZHD"
             className="h-[clamp(6rem,24dvh,15rem)] w-auto max-w-full object-contain"
           />
 
@@ -81,53 +177,11 @@ export default function Home() {
         ref={batchesRef}
         className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center space-y-4 px-4 py-5 sm:max-w-xl sm:space-y-5 sm:px-8 sm:py-6 md:max-w-2xl md:space-y-6 md:py-8"
       >
-        <h2 className="text-xl font-bold sm:text-2xl md:text-3xl">
-          Select a batch
-        </h2>
+        <h2 className="text-xl font-bold sm:text-2xl md:text-3xl">Select a batch</h2>
 
-        {batches.map((b) => {
-          const Icon = b.icon
-          return (
-            <Link
-              key={b.id}
-              to={`/batch/${b.id}`}
-              className="relative block overflow-hidden rounded-3xl border border-white/10 bg-card p-5 transition active:scale-[0.98] sm:rounded-[1.75rem] sm:p-6 md:p-7"
-            >
-              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(225,29,46,0.22),transparent_55%)]" />
-
-              <div className="relative flex items-center gap-4 sm:gap-5 md:gap-6">
-                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-brand shadow-lg shadow-brand/30 sm:h-16 sm:w-16 md:h-[4.5rem] md:w-[4.5rem]">
-                  <Icon
-                    className="h-7 w-7 text-white sm:h-8 sm:w-8 md:h-9 md:w-9"
-                    strokeWidth={2}
-                  />
-                </div>
-
-                <div className="min-w-0 flex-1">
-                  <div className="text-lg font-bold sm:text-xl md:text-2xl">
-                    {b.title}
-                  </div>
-                  <div className="text-sm leading-snug text-white/60 sm:text-base">
-                    {b.sub}
-                  </div>
-                </div>
-
-                <ArrowRight className="h-6 w-6 shrink-0 text-brand sm:h-7 sm:w-7 md:h-8 md:w-8" />
-              </div>
-
-              <div className="relative mt-4 flex flex-wrap items-center gap-2 sm:mt-5 sm:gap-2.5 md:mt-6 md:gap-3">
-                {b.chips.map((c) => (
-                  <span
-                    key={c}
-                    className="rounded-full bg-white/10 px-3 py-1.5 text-xs text-white/80 sm:px-4 sm:py-2 sm:text-sm"
-                  >
-                    {c}
-                  </span>
-                ))}
-              </div>
-            </Link>
-          )
-        })}
+        {batches.map((b) => (
+          <BatchCard key={b.id} b={b} votedIds={votedIds} />
+        ))}
       </section>
     </div>
   )
