@@ -146,7 +146,7 @@ export default function Home() {
       <section className="relative flex min-h-dvh flex-col items-center justify-center px-6 pt-[max(2.5rem,env(safe-area-inset-top))] pb-[max(2.5rem,env(safe-area-inset-bottom))] text-center sm:px-8 sm:pt-[max(3rem,env(safe-area-inset-top))] sm:pb-[max(3rem,env(safe-area-inset-bottom))]">
         <button
           onClick={async () => { await logout(); navigate('/login', { replace: true }) }}
-          className="absolute right-4 top-4 flex items-center gap-2 rounded-full bg-black/40 px-4 py-2 text-sm text-white/80 backdrop-blur-md"
+          className="absolute right-4 top-8 flex items-center gap-2 rounded-full bg-black/40 px-4 py-2 text-sm text-white/80 backdrop-blur-md"
         >
           <LogOut className="h-4 w-4" /> Log out
         </button>
