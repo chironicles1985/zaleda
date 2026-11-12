@@ -1,9 +1,10 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Users, GraduationCap, ArrowRight, ChevronDown, Check } from 'lucide-react'
+import { Users, GraduationCap, ArrowRight, ChevronDown, Check, LogOut } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { hasPending } from '../lib/outbox'
 import { useLineup } from '../lib/useLineup'
+import { logout, getRole } from '../lib/auth'
 
 const batches = [
   {
@@ -99,6 +100,11 @@ export default function Home() {
   const location = useLocation()
   const navigate = useNavigate()
   const [votedIds, setVotedIds] = useState(null) // Set of performance ids this judge submitted
+  const [role, setRole] = useState(null)
+
+  // only OGs and senior choreos judge the adults
+  const canJudgeAdults = role === 'og' || role === 'senior_choreo'
+  const visibleBatches = batches.filter((b) => b.id !== 3 || canJudgeAdults)
 
   const scrollToBatches = () => {
     batchesRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -110,6 +116,11 @@ export default function Home() {
     batchesRef.current?.scrollIntoView({ behavior: 'auto' })
     navigate('/', { replace: true, state: null }) // clear the flag so a refresh doesn't re-scroll
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // who is this judge?
+  useEffect(() => {
+    getRole().then(setRole)
+  }, [])
 
   // which performances has this judge already submitted?
   useEffect(() => {
@@ -133,6 +144,12 @@ export default function Home() {
     <div>
       {/* HERO */}
       <section className="relative flex min-h-dvh flex-col items-center justify-center px-6 pt-[max(2.5rem,env(safe-area-inset-top))] pb-[max(2.5rem,env(safe-area-inset-bottom))] text-center sm:px-8 sm:pt-[max(3rem,env(safe-area-inset-top))] sm:pb-[max(3rem,env(safe-area-inset-bottom))]">
+        <button
+          onClick={async () => { await logout(); navigate('/login', { replace: true }) }}
+          className="absolute right-4 top-4 flex items-center gap-2 rounded-full bg-black/40 px-4 py-2 text-sm text-white/80 backdrop-blur-md"
+        >
+          <LogOut className="h-4 w-4" /> Log out
+        </button>
         <div className="flex w-full max-w-md flex-col items-center gap-7 sm:max-w-xl sm:gap-9 md:max-w-2xl md:gap-10">
           {/* logo */}
           <img
@@ -147,9 +164,7 @@ export default function Home() {
               ZALEDA 2.0
             </h1>
             <p className="mx-auto mt-4 max-w-prose text-base leading-relaxed text-white/80 sm:mt-5 sm:text-lg">
-              Zaleda is SZHD's evaluation concert, where current members and
-              trainees take the stage and are judged by the people who guide
-              them. Every performance counts.
+              Every performance counts.
             </p>
             <p className="mt-3 text-sm text-white/60 sm:text-base">
               Vote honestly. Vote fairly.
@@ -179,7 +194,7 @@ export default function Home() {
       >
         <h2 className="text-xl font-bold sm:text-2xl md:text-3xl">Select a batch</h2>
 
-        {batches.map((b) => (
+        {visibleBatches.map((b) => (
           <BatchCard key={b.id} b={b} votedIds={votedIds} />
         ))}
       </section>

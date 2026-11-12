@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Eye, EyeOff } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { getRole } from '../lib/auth'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -10,6 +11,12 @@ export default function Login() {
   const [show, setShow] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    getRole().then((role) => {
+      if (role) navigate(role === 'admin' ? '/admin' : '/', { replace: true })
+    })
+  }, [navigate])
 
 
   const handleSubmit = async (e) => {
@@ -23,10 +30,17 @@ export default function Login() {
 
     setLoading(true)
     try {
-        const email = `${name.trim().toLowerCase().replace(/\s+/g, '.')}@zaleda.app`
-        const { error } = await supabase.auth.signInWithPassword({ email, password })
-        if (error) throw error
-        navigate('/')
+      const email = `${name.trim().toLowerCase().replace(/\s+/g, '.')}@zaleda.app`
+      const { error: authError } = await supabase.auth.signInWithPassword({ email, password })
+      if (authError) throw authError
+
+      const role = await getRole()
+      if (!role) {
+        await supabase.auth.signOut()
+        setError('Your account has no role yet. Please tell the organizer.')
+        return
+      }
+      navigate(role === 'admin' ? '/admin' : '/', { replace: true })
     } catch {
       setError('Wrong name or password. Try again.')
     } finally {
@@ -56,9 +70,6 @@ export default function Login() {
         <img src="/logo.png" alt="SXHD" className="mx-auto h-24 w-24 object-contain" /> */}
 
         <h1 className="mt-5 text-center text-2xl font-bold">Welcome to ZALEDA 2.0</h1>
-        <p className="mt-1 text-center text-sm text-white/60">
-          Log in.
-        </p>
 
         <div className="mt-7 space-y-5">
           <div>

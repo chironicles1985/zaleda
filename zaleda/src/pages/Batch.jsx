@@ -173,6 +173,7 @@ export default function Batch() {
     const [active, setActive] = useState(0)
     const [online, setOnline] = useState(navigator.onLine)
     const [finished, setFinished] = useState(false)
+    const [dir, setDir] = useState(null) 
 
   useEffect(() => {
     const up = () => setOnline(true)
@@ -366,16 +367,20 @@ export default function Batch() {
       </header>
 
       {/* current performance: flexes with screen height, never below 26rem */}
-      <div className="min-h-[26rem] flex-1 shrink-0">
+      <div className="min-h-[26rem] flex-1 shrink-0 overflow-x-hidden">
         {current && (
-          <PerformanceSlide
+          <div
             key={current.id}
-            perf={current}
-            votes={votes}
-            onVote={handleVote}
-            locked={!!currentSub}
-            sub={currentSub}
-          />
+            className={`h-full ${dir === 'next' ? 'slide-next' : dir === 'prev' ? 'slide-prev' : ''}`}
+          >
+            <PerformanceSlide
+              perf={current}
+              votes={votes}
+              onVote={handleVote}
+              locked={!!currentSub}
+              sub={currentSub}
+            />
+          </div>
         )}
       </div>
 
@@ -411,7 +416,7 @@ export default function Batch() {
 
         <div className="flex items-center gap-3 md:portrait:gap-[3.35cqw]">
           <button
-            onClick={() => setActive((a) => a - 1)}
+            onClick={() => { setDir('prev'); setActive((a) => a - 1) }}
             disabled={!canPrev}
             aria-label="Previous performance"
             className={arrowCls}
@@ -428,7 +433,14 @@ export default function Batch() {
           </button>
 
           <button
-            onClick={() => (isLast ? setFinished(true) : setActive((a) => a + 1))}
+            onClick={() => {
+              if (isLast) {
+                setFinished(true)
+              } else {
+                setDir('next')
+                setActive((a) => a + 1)
+              }
+            }}
             disabled={!canNext}
             aria-label={isLast ? 'Finish roster' : 'Next performance'}
             className={`${arrowCls} ${canNext ? 'border-brand bg-brand' : ''}`}

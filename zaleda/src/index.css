@@ -27,3 +27,18 @@ body {
   z-index: 1;
   min-height: 100vh;
 }
+
+@keyframes slide-in-next {
+  from { opacity: 0; transform: translateX(48px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes slide-in-prev {
+  from { opacity: 0; transform: translateX(-48px); }
+  to   { opacity: 1; transform: none; }
+}
+.slide-next { animation: slide-in-next 0.35s ease-out both; }
+.slide-prev { animation: slide-in-prev 0.35s ease-out both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .slide-next, .slide-prev { animation: none; }
+}

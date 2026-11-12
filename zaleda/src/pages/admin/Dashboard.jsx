@@ -135,6 +135,12 @@ export default function Dashboard() {
           >
             <Download className="h-4 w-4" /> Export CSV
           </button>
+          <button
+            onClick={async () => { await logout(); navigate('/login') }}
+            className="absolute right-4 top-4 flex items-center gap-2 rounded-full bg-black/40 px-4 py-2 text-sm text-white/80 backdrop-blur-md"
+          >
+            <LogOut className="h-4 w-4" /> Log out
+          </button>
         </div>
 
         {/* batch chips */}

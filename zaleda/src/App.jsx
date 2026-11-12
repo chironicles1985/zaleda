@@ -1,9 +1,9 @@
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import Login from './pages/Login'
 import Home from './pages/Home'
 import Batch from './pages/Batch'
-import Vote from './pages/Vote'
 import Dashboard from './pages/admin/Dashboard'
+import RequireAuth from './components/RequireAuth'
 import ColorBends from './assets/Particles'
 
 export default function App() {
@@ -29,10 +29,10 @@ export default function App() {
       <main className="app-content">
         <Routes>
           <Route path="/login" element={<Login />} />
-          <Route path="/" element={<Home />} />
-          <Route path="/batch/:id" element={<Batch />} />
-          <Route path="/vote/:performanceId" element={<Vote />} />
-          <Route path="/admin" element={<Dashboard />} />
+          <Route path="/" element={<RequireAuth><Home /></RequireAuth>} />
+          <Route path="/batch/:id" element={<RequireAuth><Batch /></RequireAuth>} />
+          <Route path="/admin" element={<RequireAuth admin><Dashboard /></RequireAuth>} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
     </>
