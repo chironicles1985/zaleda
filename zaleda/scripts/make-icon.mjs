@@ -19,7 +19,7 @@ async function make(size, file, logoRatio) {
   console.log(`OK: public/${file}`)
 }
 
-await make(180, 'apple-touch-icon.png', 0.7) // iPhone home screen
+await make(180, 'apple-touch-icon.png', 0.7)
 await make(192, 'icon-192.png', 0.7)
 await make(512, 'icon-512.png', 0.7)
-await make(512, 'icon-maskable-512.png', 0.55) // extra padding so Android's round crop doesn't cut the logo
+await make(512, 'icon-maskable-512.png', 0.55)
