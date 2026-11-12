@@ -11,7 +11,7 @@ export default defineConfig({
       registerType: 'autoUpdate',
       manifest: {
       name: 'ZALEDA 2.0',
-      short_name: 'Zaleda',
+      short_name: 'ZALEDA 2.0',
       theme_color: '#0a0a0a',
       background_color: '#0a0a0a',
       display: 'standalone',
