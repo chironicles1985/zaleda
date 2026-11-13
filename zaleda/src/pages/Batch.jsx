@@ -37,8 +37,9 @@ function PerformerCard({ p, vote, onVote, locked }) {
 
       <div className="absolute inset-x-0 bottom-0 p-5 md:portrait:p-[5.6cqw]">
         <h2 className="text-3xl font-extrabold leading-tight md:portrait:text-[8.4cqw]">{p.name}</h2>
-        <p className="mb-4 mt-1 text-base font-semibold text-brand md:portrait:mb-[4.5cqw] md:portrait:mt-[1.1cqw] md:portrait:text-[4.5cqw]">{p.age} years old</p>
-
+        {p.age && (
+          <p className="mb-4 mt-1 text-base font-semibold text-brand md:portrait:mb-[4.5cqw] md:portrait:mt-[1.1cqw] md:portrait:text-[4.5cqw]">{p.age} years old</p>
+        )}
         <div className="flex flex-wrap gap-2 md:portrait:gap-[2.2cqw]">
           {p.styles.slice(0, 2).map((s) => (
             <span

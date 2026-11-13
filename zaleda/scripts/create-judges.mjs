@@ -9,16 +9,16 @@ const supabase = createClient(
 
 const ROLES = ['og', 'senior_choreo', 'adult', 'admin']
 
-// MUST match how Login.jsx builds the email
+// MUST match how Login.jsx builds the email and password
 const toEmail = (name) => `${name.trim().toLowerCase().replace(/\s+/g, '.')}@zaleda.app`
+const toPassword = (p) => p.trim().toUpperCase() + '-ZALEDA'
 
 const lines = readFileSync('scripts/judges.csv', 'utf8')
   .replace(/^\uFEFF/, '')
   .split(/\r?\n/)
   .filter((l) => l.trim())
-  .slice(1) // skip header
+  .slice(1)
 
-// existing accounts, so re-running the script updates instead of failing
 const { data: existing } = await supabase.auth.admin.listUsers({ perPage: 1000 })
 const byEmail = new Map(existing.users.map((u) => [u.email, u.id]))
 
@@ -28,8 +28,9 @@ let ok = 0
 for (const line of lines) {
   const [name, role, pin] = line.split(',').map((s) => s.trim())
   const email = toEmail(name)
+  const password = toPassword(pin ?? '')
 
-  if (!name || !ROLES.includes(role) || !pin || pin.length < 6) {
+  if (!name || !ROLES.includes(role) || !pin) {
     console.log(`SKIPPED (bad row): ${line}`)
     continue
   }
@@ -41,11 +42,11 @@ for (const line of lines) {
 
   let id = byEmail.get(email)
   if (id) {
-    await supabase.auth.admin.updateUserById(id, { password: pin })
+    await supabase.auth.admin.updateUserById(id, { password })
   } else {
     const { data, error } = await supabase.auth.admin.createUser({
       email,
-      password: pin,
+      password,
       email_confirm: true,
     })
     if (error) {

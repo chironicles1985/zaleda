@@ -4,6 +4,8 @@ import { Eye, EyeOff } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { getRole } from '../lib/auth'
 
+const toPassword = (p) => p.trim().toUpperCase() + '-ZALEDA'
+
 export default function Login() {
   const navigate = useNavigate()
   const [name, setName] = useState('')
@@ -31,7 +33,10 @@ export default function Login() {
     setLoading(true)
     try {
       const email = `${name.trim().toLowerCase().replace(/\s+/g, '.')}@zaleda.app`
-      const { error: authError } = await supabase.auth.signInWithPassword({ email, password })
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password: toPassword(password),
+      })
       if (authError) throw authError
 
       const role = await getRole()
