@@ -9,6 +9,12 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
+      // Load the whole app (including every performer photo) into the device
+      // cache on the first online visit, so it all works with no internet.
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,svg,png,ico,jpg,jpeg,webp,woff,woff2}'],
+        navigateFallback: 'index.html',
+      },
       manifest: {
       name: 'ZALEDA 2.0',
       short_name: 'ZALEDA 2.0',

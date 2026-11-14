@@ -28,7 +28,11 @@ export function useLineup(batchId) {
 
   useEffect(() => {
     let cancelled = false
-    setPerformances(readCache(batchId))
+    const cached = readCache(batchId)
+
+    // Offline with a cached lineup: the initial state already shows it, so
+    // don't even attempt a network request.
+    if (!navigator.onLine && cached) return () => { cancelled = true }
 
     supabase
       .from('performances')

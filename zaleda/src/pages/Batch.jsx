@@ -3,9 +3,10 @@ import { Link, useParams } from 'react-router-dom'
 import {
   ArrowLeft, ArrowRight, Check, X, Wifi, WifiOff, CloudCheck, HardDrive, ChevronsDown,
 } from 'lucide-react'
-import { supabase } from '../lib/supabase'
 import { enqueue, flush, hasPending } from '../lib/outbox'
 import { useLineup } from '../lib/useLineup'
+import { getUserId } from '../lib/auth'
+import { addCachedVotes, loadVotes } from '../lib/voteStore'
 
 // One shared column for header, card and bottom bar.
 // Phones use a fixed column; laptops/desktops cap it at 25rem; portrait tablets
@@ -18,6 +19,67 @@ const COLUMN =
 const titles = { 3: 'Adult Members', 4: 'Trainees Batch 1', 5: 'Trainees Batch 2' }
 
 // -------------------------------------------------------------------------
+
+// Dots stay a fixed size and only the active one stretches. When a roster has
+// more performances than fit, a window of dots around the active one is shown
+// instead of squeezing every dot into the row.
+const DOT = {
+  phone: { width: 8, active: 24, gap: 6 },
+  tablet: { width: 10, active: 32, gap: 6 },
+}
+const MAX_DOTS = 15
+
+function ProgressDots({ performances, submissions, active }) {
+  const rowRef = useRef(null)
+  const [room, setRoom] = useState(0)
+
+  useEffect(() => {
+    const el = rowRef.current
+    if (!el) return
+    const ro = new ResizeObserver(([entry]) => setRoom(entry.contentRect.width))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  const size = room >= 420 ? DOT.tablet : DOT.phone
+  const fits = 1 + Math.floor((room - size.active) / (size.width + size.gap))
+  const visible = Math.max(
+    5,
+    Math.min(performances.length, room ? fits : MAX_DOTS, MAX_DOTS),
+  )
+  const start = Math.min(
+    Math.max(0, active - Math.floor((visible - 1) / 2)),
+    performances.length - visible,
+  )
+
+  return (
+    <div className={COLUMN}>
+      <div ref={rowRef} className="flex items-center justify-center gap-1.5 py-3 md:portrait:py-4">
+        {performances.slice(start, start + visible).map((perf, i) => {
+          const index = start + i
+          const s = submissions[perf.id]?.status
+          const isActive = index === active
+          return (
+            <span
+              key={perf.id}
+              className={`h-2 shrink-0 rounded-full transition-all md:portrait:h-2.5 ${
+                isActive
+                  ? 'w-6 bg-brand md:portrait:w-8'
+                  : `w-2 md:portrait:w-2.5 ${
+                      s === 'synced'
+                        ? 'bg-green-400'
+                        : s === 'local'
+                          ? 'bg-amber-300'
+                          : 'bg-white/25'
+                    }`
+              }`}
+            />
+          )
+        })}
+      </div>
+    </div>
+  )
+}
 
 function PerformerCard({ p, vote, onVote, locked }) {
   const initials = p.name.split(' ').map((w) => w[0]).join('').slice(0, 2)
@@ -191,24 +253,24 @@ export default function Batch() {
     if (!lineup) return
      let cancelled = false
      ;(async () => {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (!session) return
-        if (!session) return
+        const userId = await getUserId()
+        if (!userId) return
 
-        const { data } = await supabase
-            .from('votes')
-            .select('performance_id, performer_id, vote')
-            .eq('judge_id', session.user.id)
-
+        // Server when online; this device's mirror when not.
+        const data = await loadVotes(userId)
         if (cancelled) return
-        const subs = {}
+
         const restored = {}
-        ;(data ?? []).forEach((v) => {
-            subs[v.performance_id] = { status: 'synced' }
+        const votedPerformances = new Set()
+        data.forEach((v) => {
             restored[v.performer_id] = v.vote
+            votedPerformances.add(v.performance_id)
         })
+
+        const subs = {}
         lineup.forEach((p) => {
-            if (!subs[p.id] && hasPending(p.id)) subs[p.id] = { status: 'local' }
+            if (hasPending(p.id)) subs[p.id] = { status: 'local' }
+            else if (votedPerformances.has(p.id)) subs[p.id] = { status: 'synced' }
         })
 
         setSubmissions((s) => ({ ...subs, ...s }))
@@ -247,16 +309,17 @@ export default function Batch() {
 
   const handleSubmit = async () => {
     if (!current || !allVoted || currentSub) return
-    const { data: { session } } = await supabase.auth.getSession() // reads the saved session, works offline
-    if (!session) return
+    const userId = await getUserId() // cached identity, so this works offline
+    if (!userId) return
      const rows = current.members.map((m) => ({
-        judge_id: session.user.id,
+        judge_id: userId,
         performer_id: m.id,
         performance_id: current.id,
         vote: votes[m.id],
         client_ts: new Date().toISOString(),
     }))
     enqueue(current.id, rows) // saved on the phone first
+    addCachedVotes(userId, rows) // progress survives an offline reload
     setSubmissions((s) => ({ ...s, [current.id]: { status: 'local', at: Date.now() } }))
     flush((pid) => setSubmissions((s) => ({ ...s, [pid]: { ...s[pid], status: 'synced' } })))
 }
@@ -346,7 +409,7 @@ export default function Batch() {
   return (
     <div className="flex h-dvh flex-col overflow-y-auto">
       {/* header */}
-      <header className={`${COLUMN} flex items-center gap-3 pb-3 pt-5 md:portrait:gap-[3.35cqw] md:portrait:pb-[3.35cqw] md:portrait:pt-[5.6cqw]`}>
+      <header className={`${COLUMN} flex items-center gap-3 pb-3 pt-[max(2rem,calc(env(safe-area-inset-top)+0.5rem))] md:pt-6 md:portrait:gap-[3.35cqw] md:portrait:pb-[3.35cqw] md:portrait:pt-[6.7cqw]`}>
         <Link to="/" className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 md:portrait:h-[11.2cqw] md:portrait:w-[11.2cqw]">
           <ArrowLeft className="h-5 w-5 md:portrait:h-[5.6cqw] md:portrait:w-[5.6cqw]" />
         </Link>
@@ -386,27 +449,7 @@ export default function Batch() {
       </div>
 
       {/* progress dots */}
-      <div className="flex w-full items-center justify-center gap-1 px-4 py-3 md:portrait:gap-1.5 md:portrait:py-4">
-        {performances.map((perf, i) => {
-          const s = submissions[perf.id]?.status
-          return (
-            <span
-              key={perf.id}
-              className={`h-2 min-w-0 rounded-full transition-all md:portrait:h-2.5 ${
-                i === active
-                  ? 'max-w-6 flex-[3] bg-brand md:portrait:max-w-8'
-                  : `max-w-2 flex-1 md:portrait:max-w-2.5 ${
-                      s === 'synced'
-                        ? 'bg-green-400'
-                        : s === 'local'
-                          ? 'bg-amber-300'
-                          : 'bg-white/25'
-                    }`
-              }`}
-            />
-          )
-        })} 
-      </div>
+      <ProgressDots performances={performances} submissions={submissions} active={active} />
 
       {/* bottom bar */}
       <div className={`${COLUMN} space-y-2 pb-[max(1rem,env(safe-area-inset-bottom))] md:portrait:space-y-[2.2cqw]`}>

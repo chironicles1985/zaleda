@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Eye, EyeOff } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import { getRole } from '../lib/auth'
+import { getRole, clearIdentity } from '../lib/auth'
 
 const toPassword = (p) => p.trim().toUpperCase() + '-ZALEDA'
 
@@ -41,6 +41,7 @@ export default function Login() {
 
       const role = await getRole()
       if (!role) {
+        clearIdentity()
         await supabase.auth.signOut()
         setError('Your account has no role yet. Please tell the organizer.')
         return

@@ -14,7 +14,7 @@ export function enqueue(performanceId, rows) {
 
 let flushing = false
 export async function flush(onSynced) {
-  if (flushing) return
+  if (flushing || !navigator.onLine) return
   flushing = true
   try {
     for (const item of read()) {

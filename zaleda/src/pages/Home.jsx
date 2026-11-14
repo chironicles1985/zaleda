@@ -1,10 +1,10 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Users, GraduationCap, ArrowRight, ChevronDown, Check, LogOut } from 'lucide-react'
-import { supabase } from '../lib/supabase'
 import { hasPending } from '../lib/outbox'
 import { useLineup } from '../lib/useLineup'
-import { logout, getRole } from '../lib/auth'
+import { logout, getRole, getUserId } from '../lib/auth'
+import { loadVotes } from '../lib/voteStore'
 
 const batches = [
   {
@@ -123,19 +123,13 @@ export default function Home() {
   }, [])
 
   // which performances has this judge already submitted?
+  // online: server, mirrored locally; offline: straight from the mirror
   useEffect(() => {
     let cancelled = false
     ;(async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
-        if (!cancelled) setVotedIds(new Set())
-        return
-      }
-      const { data } = await supabase
-        .from('votes')
-        .select('performance_id')
-        .eq('judge_id', session.user.id)
-      if (!cancelled) setVotedIds(new Set((data ?? []).map((v) => v.performance_id)))
+      const userId = await getUserId()
+      const data = await loadVotes(userId)
+      if (!cancelled) setVotedIds(new Set(data.map((v) => v.performance_id)))
     })()
     return () => { cancelled = true }
   }, [])
@@ -164,7 +158,7 @@ export default function Home() {
               ZALEDA 2.0
             </h1>
             <p className="mx-auto mt-4 max-w-prose text-base leading-relaxed text-white/80 sm:mt-5 sm:text-lg">
-              Every performance counts.
+              DEFINE YOURSELF.
             </p>
             <p className="mt-3 text-sm text-white/60 sm:text-base">
               Vote honestly. Vote fairly.

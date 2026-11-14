@@ -95,9 +95,12 @@ export default function Dashboard() {
 
   // load now, then refresh every 10 seconds
   useEffect(() => {
-    load()
+    const kick = setTimeout(load, 0)
     const t = setInterval(load, 10000)
-    return () => clearInterval(t)
+    return () => {
+      clearTimeout(kick)
+      clearInterval(t)
+    }
   }, [load])
 
   const batch = BATCHES.find((b) => b.id === batchId)
