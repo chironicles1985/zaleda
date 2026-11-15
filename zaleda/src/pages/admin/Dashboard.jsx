@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Download, CheckCircle2, XCircle, Clock, RefreshCw, LogOut } from 'lucide-react'
+import { Download, CheckCircle2, XCircle, Clock, RefreshCw, LogOut, ChevronDown } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { logout } from '../../lib/auth'
 
@@ -28,17 +28,45 @@ function getResult(r) {
 }
 
 const STATUS = {
-  pass: { label: 'PASS', icon: CheckCircle2, cls: 'bg-green-500/15 text-green-300 border-green-500/30' },
-  fail: { label: 'FAIL', icon: XCircle, cls: 'bg-red-500/15 text-red-300 border-red-500/30' },
-  pending: { label: 'PENDING', icon: Clock, cls: 'bg-amber-400/15 text-amber-200 border-amber-400/30' },
+  pass: { label: 'PASS', icon: CheckCircle2, tone: 'text-green-300' },
+  fail: { label: 'FAIL', icon: XCircle, tone: 'text-red-300' },
+  pending: { label: 'PENDING', icon: Clock, tone: 'text-amber-300' },
 }
 
-function StatusChip({ status }) {
-  const s = STATUS[status]
+const STATUS_ORDER = ['pass', 'fail', 'pending']
+
+// The admin picks the status by hand. The saved choice is kept on this device,
+// so it survives the 10-second refresh and a page reload.
+const STATUS_KEY = 'zaleda-status'
+
+function readStatusChoices() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STATUS_KEY))
+    return saved && typeof saved === 'object' ? saved : {}
+  } catch {
+    return {}
+  }
+}
+
+function StatusSelect({ value, onChange, name }) {
+  const s = STATUS[value] ?? STATUS.pending
   const Icon = s.icon
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold ${s.cls}`}>
-      <Icon className="h-3.5 w-3.5" /> {s.label}
+    <span className="relative inline-flex items-center">
+      <Icon className={`pointer-events-none absolute left-3 h-3.5 w-3.5 ${s.tone}`} />
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        aria-label={`Status for ${name}`}
+        className="cursor-pointer appearance-none rounded-full border border-white/20 bg-white/10 py-1.5 pl-8 pr-8 text-xs font-bold uppercase tracking-wider text-white/90 outline-none backdrop-blur-md transition hover:bg-white/15 focus:border-white/40"
+      >
+        {STATUS_ORDER.map((key) => (
+          <option key={key} value={key} className="bg-neutral-900 text-white">
+            {STATUS[key].label}
+          </option>
+        ))}
+      </select>
+      <ChevronDown className="pointer-events-none absolute right-2.5 h-3.5 w-3.5 text-white/60" />
     </span>
   )
 }
@@ -51,6 +79,19 @@ export default function Dashboard() {
   const [updated, setUpdated] = useState(null)
   const [batchId, setBatchId] = useState(BATCHES[0].id)
   const [sortBy, setSortBy] = useState('order') // 'order' | 'no'
+  const [statusChoices, setStatusChoices] = useState(readStatusChoices)
+
+  const chooseStatus = (id, value) => {
+    setStatusChoices((prev) => {
+      const next = { ...prev, [id]: value }
+      try {
+        localStorage.setItem(STATUS_KEY, JSON.stringify(next))
+      } catch {
+        // Storage full/unavailable: the choice still applies until reload.
+      }
+      return next
+    })
+  }
 
   const load = useCallback(async () => {
     const [perfRes, resRes] = await Promise.all([
@@ -109,16 +150,16 @@ export default function Dashboard() {
   const batchRows = useMemo(() => {
     const list = rows
       .filter((r) => r.batch === batchId)
-      .map((r) => ({ ...r, result: getResult(r) }))
+      .map((r) => ({ ...r, status: statusChoices[r.id] ?? getResult(r).status }))
       .sort((a, b) => a.order - b.order)
     if (sortBy === 'no') list.sort((a, b) => b.no - a.no || a.order - b.order)
     return list
-  }, [rows, batchId, sortBy])
+  }, [rows, batchId, sortBy, statusChoices])
 
   const counts = {
-    pass: batchRows.filter((r) => r.result.status === 'pass').length,
-    fail: batchRows.filter((r) => r.result.status === 'fail').length,
-    pending: batchRows.filter((r) => r.result.status === 'pending').length,
+    pass: batchRows.filter((r) => r.status === 'pass').length,
+    fail: batchRows.filter((r) => r.status === 'fail').length,
+    pending: batchRows.filter((r) => r.status === 'pending').length,
   }
 
   const exportCsv = () => {
@@ -129,9 +170,10 @@ export default function Dashboard() {
         .sort((x, y) => x.order - y.order)
         .forEach((r) => {
           const res = getResult(r)
+          const status = statusChoices[r.id] ?? res.status
           lines.push([
             b.label, r.order, r.type, r.name, r.yes, r.votesIn, r.eligible,
-            res.pct === null ? '' : res.pct.toFixed(1), res.status.toUpperCase(),
+            res.pct === null ? '' : res.pct.toFixed(1), status.toUpperCase(),
           ])
         })
     })
@@ -252,7 +294,7 @@ export default function Dashboard() {
                 </thead>
                 <tbody>
                   {batchRows.map((r) => {
-                    const { status } = r.result
+                    const { status } = r
                     return (
                       <tr key={r.id} className="border-t border-white/5">
                         <td className="px-5 py-3.5">
@@ -279,7 +321,11 @@ export default function Dashboard() {
                         </td>
 
                         <td className="px-5 py-3.5 text-right">
-                          <StatusChip status={status} />
+                          <StatusSelect
+                            value={status}
+                            name={r.name}
+                            onChange={(value) => chooseStatus(r.id, value)}
+                          />
                         </td>
                       </tr>
                     )
