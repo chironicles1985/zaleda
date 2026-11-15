@@ -50,7 +50,7 @@ export default function Dashboard() {
   const [error, setError] = useState('')
   const [updated, setUpdated] = useState(null)
   const [batchId, setBatchId] = useState(BATCHES[0].id)
-  const [sortBy, setSortBy] = useState('order') // 'order' | 'rating'
+  const [sortBy, setSortBy] = useState('order') // 'order' | 'no'
 
   const load = useCallback(async () => {
     const [perfRes, resRes] = await Promise.all([
@@ -81,6 +81,7 @@ export default function Dashboard() {
           type: p.type,
           name: pm.performers.name,
           yes: Number(r?.yes_count ?? 0),
+          no: Number(r?.votes_in ?? 0) - Number(r?.yes_count ?? 0),
           votesIn: Number(r?.votes_in ?? 0),
           eligible: Number(r?.eligible ?? 0),
         })
@@ -110,7 +111,7 @@ export default function Dashboard() {
       .filter((r) => r.batch === batchId)
       .map((r) => ({ ...r, result: getResult(r) }))
       .sort((a, b) => a.order - b.order)
-    if (sortBy === 'rating') list.sort((a, b) => (b.result.pct ?? -1) - (a.result.pct ?? -1))
+    if (sortBy === 'no') list.sort((a, b) => b.no - a.no || a.order - b.order)
     return list
   }, [rows, batchId, sortBy])
 
@@ -225,10 +226,10 @@ export default function Dashboard() {
           <div className="flex items-center justify-between border-b border-white/10 px-5 py-3 text-xs text-white/60">
             <span>{eligible} judges per performer</span>
             <button
-              onClick={() => setSortBy((s) => (s === 'order' ? 'rating' : 'order'))}
+              onClick={() => setSortBy((s) => (s === 'order' ? 'no' : 'order'))}
               className="rounded-full bg-white/10 px-3 py-1.5 font-semibold text-white/80"
             >
-              Sort: {sortBy === 'order' ? 'Performance order' : 'Highest rating'}
+              Sort: {sortBy === 'order' ? 'Performance order' : 'Most NO votes'}
             </button>
           </div>
 
@@ -240,18 +241,18 @@ export default function Dashboard() {
             </p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[34rem] text-left">
+              <table className="w-full min-w-[28rem] text-left">
                 <thead>
                   <tr className="text-xs uppercase tracking-wider text-white/50">
                     <th className="px-5 py-3 font-semibold">Performer</th>
-                    <th className="px-3 py-3 font-semibold">Rating</th>
                     <th className="px-3 py-3 font-semibold">YES</th>
+                    <th className="px-3 py-3 font-semibold">NO</th>
                     <th className="px-5 py-3 text-right font-semibold">Status</th>
                   </tr>
                 </thead>
                 <tbody>
                   {batchRows.map((r) => {
-                    const { status, pct, borderline } = r.result
+                    const { status } = r.result
                     return (
                       <tr key={r.id} className="border-t border-white/5">
                         <td className="px-5 py-3.5">
@@ -261,31 +262,6 @@ export default function Dashboard() {
                           </div>
                         </td>
 
-                        <td className="w-56 px-3 py-3.5">
-                          {pct === null ? (
-                            <span className="text-sm text-white/40">Waiting for votes</span>
-                          ) : (
-                            <div>
-                              <div className="flex items-baseline gap-2">
-                                <span className="text-lg font-bold">{pct.toFixed(0)}%</span>
-                                {borderline && (
-                                  <span className="text-[11px] font-semibold text-amber-300">close call</span>
-                                )}
-                              </div>
-                              <div className="relative mt-1 h-1.5 rounded-full bg-white/10">
-                                <div
-                                  className={`h-full rounded-full ${status === 'pass' ? 'bg-green-400' : 'bg-brand'}`}
-                                  style={{ width: `${pct}%` }}
-                                />
-                                <div
-                                  className="absolute -top-1 h-3.5 w-0.5 bg-white/70"
-                                  style={{ left: `${PASS_PERCENT}%` }}
-                                />
-                              </div>
-                            </div>
-                          )}
-                        </td>
-
                         <td className="px-3 py-3.5 text-sm text-white/70">
                           {r.yes}/{r.eligible}
                           {status === 'pending' && (
@@ -293,6 +269,13 @@ export default function Dashboard() {
                               {r.votesIn}/{r.eligible} voted
                             </div>
                           )}
+                        </td>
+
+                        <td className="px-3 py-3.5 text-sm">
+                          <span className={r.no > 0 ? 'font-semibold text-red-300' : 'text-white/40'}>
+                            {r.no}
+                          </span>
+                          <span className="text-white/40">/{r.eligible}</span>
                         </td>
 
                         <td className="px-5 py-3.5 text-right">
